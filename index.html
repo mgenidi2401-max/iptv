@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>مشغل IPTV الشخصي</title>
+
+  <!-- HLS Player -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
+  <style>
+    :root{
+      --bg1:#140316;
+      --bg2:#4b0d22;
+      --card:rgba(255,255,255,.09);
+      --card2:rgba(255,255,255,.14);
+      --text:#fff;
+      --muted:#d9c7cf;
+      --accent:#9b123f;
+      --accent2:#ffcc66;
+      --ok:#35d07f;
+      --bad:#ff5b6e;
+      --border:rgba(255,255,255,.18);
+      --shadow:0 18px 45px rgba(0,0,0,.35);
+    }
+
+    *{box-sizing:border-box}
+
+    body{
+      margin:0;
+      font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+      color:var(--text);
+      min-height:100vh;
+      background:
+        radial-gradient(circle at 20% 10%, rgba(255,204,102,.20), transparent 28%),
+        radial-gradient(circle at 90% 20%, rgba(155,18,63,.55), transparent 35%),
+        linear-gradient(135deg,var(--bg1),var(--bg2));
+      overflow-x:hidden;
+    }
+
+    .topbar{
+      position:sticky;
+      top:0;
+      z-index:20;
+      backdrop-filter: blur(16px);
+      background:rgba(15,3,20,.72);
+      border-bottom:1px solid var(--border);
+      padding:12px 16px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+    }
+
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      font-weight:900;
+      letter-spacing:.2px;
+    }
+
+    .logo{
+      width:38px;
+      height:38px;
+      border-radius:13px;
+      display:grid;
+      place-items:center;
+      background:linear-gradient(135deg,var(--accent),#2b0617);
+      box-shadow:0 10px 28px rgba(155,18,63,.35);
+    }
+
+    .badge{
+      font-size:12px;
+      color:#2a1300;
+      background:var(--accent2);
+      padding:6px 10px;
+      border-radius:999px;
+      font-weight:800;
+      white-space:nowrap;
+    }
+
+    .wrap{
+      width:min(1450px,100%);
+      margin:auto;
+      padding:18px;
+      display:grid;
+      grid-template-columns:360px 1fr;
+      gap:18px;
+    }
+
+    .panel,.playerBox,.channelsBox{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:24px;
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+
+    .panel{
+      padding:16px;
+      height:calc(100vh - 92px);
+      position:sticky;
+      top:74px;
+      overflow:auto;
+    }
+
+    .sectionTitle{
+      margin:0 0 12px;
+      font-size:18px;
+      font-weight:900;
+    }
+
+    label{
+      font-size:13px;
+      color:var(--muted);
+      display:block;
+      margin:10px 2px 6px;
+    }
+
+    input,select,button{
+      width:100%;
+      border:0;
+      outline:0;
+      border-radius:14px;
+      font-family:inherit;
+    }
+
+    input,select{
+      background:rgba(0,0,0,.28);
+      color:var(--text);
+      border:1px solid var(--border);
+      padding:12px 13px;
+      direction:ltr;
+      text-align:left;
+    }
+
+    select{
+      direction:rtl;
+      text-align:right;
+    }
+
+    button{
+      padding:13px 14px;
+      color:#fff;
+      background:linear-gradient(135deg,var(--accent),#6b0b2c);
+      font-weight:900;
+      cursor:pointer;
+      margin-top:12px;
+      box-shadow:0 10px 24px rgba(155,18,63,.32);
+      transition:.18s;
+    }
+
+    button:hover{transform:translateY(-1px)}
+    button.secondary{
+      background:rgba(255,255,255,.12);
+      border:1px solid var(--border);
+      box-shadow:none;
+    }
+
+    .row{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+    }
+
+    .saveLine{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      margin-top:12px;
+      color:var(--muted);
+      font-size:13px;
+      user-select:none;
+    }
+
+    .saveLine input{
+      width:auto;
+      accent-color:var(--accent);
+    }
+
+    .status{
+      margin-top:12px;
+      padding:10px;
+      border-radius:14px;
+      background:rgba(0,0,0,.22);
+      border:1px solid var(--border);
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.6;
+      min-height:42px;
+    }
+
+    .main{
+      display:flex;
+      flex-direction:column;
+      gap:18px;
+      min-width:0;
+    }
+
+    .playerBox{
+      padding:14px;
+    }
+
+    .now{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:12px;
+    }
+
+    .now h2{
+      margin:0;
+      font-size:18px;
+      line-height:1.4;
+    }
+
+    .now small{
+      color:var(--muted);
+      display:block;
+      margin-top:3px;
+      direction:ltr;
+      text-align:left;
+    }
+
+    video{
+      width:100%;
+      background:#000;
+      border-radius:20px;
+      min-height:390px;
+      max-height:68vh;
+      object-fit:contain;
+      border:1px solid rgba(255,255,255,.12);
+    }
+
+    .tools{
+      display:grid;
+      grid-template-columns:1.2fr .8fr .8fr;
+      gap:10px;
+      padding:14px;
+      border-bottom:1px solid var(--border);
+      background:rgba(0,0,0,.16);
+    }
+
+    .channelsBox{
+      min-height:260px;
+    }
+
+    .stats{
+      padding:10px 14px;
+      color:var(--muted);
+      font-size:13px;
+      border-bottom:1px solid var(--border);
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    .channels{
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(210px,1fr));
+      gap:12px;
+      padding:14px;
+    }
+
+    .channel{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      min-height:74px;
+      padding:11px;
+      border-radius:18px;
+      background:rgba(255,255,255,.08);
+      border:1px solid rgba(255,255,255,.12);
+      cursor:pointer;
+      transition:.16s;
+      overflow:hidden;
+    }
+
+    .channel:hover{
+      transform:translateY(-2px);
+      background:rgba(255,255,255,.14);
+    }
+
+    .channel.active{
+      border-color:var(--accent2);
+      box-shadow:0 0 0 2px rgba(255,204,102,.18) inset;
+    }
+
+    .chLogo{
+      width:50px;
+      height:50px;
+      border-radius:15px;
+      background:rgba(0,0,0,.25);
+      object-fit:contain;
+      flex:0 0 auto;
+      padding:4px;
+    }
+
+    .chText{
+      min-width:0;
+    }
+
+    .chName{
+      font-weight:800;
+      font-size:14px;
+      line-height:1.35;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    .chGroup{
+      color:var(--muted);
+      font-size:12px;
+      margin-top:4px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    .empty{
+      padding:35px 16px;
+      text-align:center;
+      color:var(--muted);
+      line-height:1.8;
+    }
+
+    .hint{
+      margin-top:12px;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.7;
+    }
+
+    .danger{
+      color:#ffd3da;
+      background:rgba(255,91,110,.11);
+      border:1px solid rgba(255,91,110,.25);
+      border-radius:14px;
+      padding:10px;
+      margin-top:12px;
+      font-size:12px;
+      line-height:1.7;
+    }
+
+    .miniButtons{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+    }
+
+    @media (max-width: 900px){
+      .wrap{
+        grid-template-columns:1fr;
+        padding:10px;
+      }
+
+      .panel{
+        position:relative;
+        top:auto;
+        height:auto;
+      }
+
+      video{
+        min-height:220px;
+      }
+
+      .tools{
+        grid-template-columns:1fr;
+      }
+
+      .channels{
+        grid-template-columns:1fr;
+      }
+
+      .topbar{
+        align-items:flex-start;
+        flex-direction:column;
+      }
+
+      .badge{
+        white-space:normal;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">📺</div>
+      <div>
+        <div>مشغل IPTV الشخصي</div>
+        <small style="color:var(--muted)">GitHub Pages Ready</small>
+      </div>
+    </div>
+    <div class="badge">بيانات الاشتراك لا تُحفظ إلا على جهازك إذا اخترت ذلك</div>
+  </header>
+
+  <div class="wrap">
+    <aside class="panel">
+      <h1 class="sectionTitle">بيانات الاشتراك</h1>
+
+      <label>رابط السيرفر / Server URL</label>
+      <input id="server" placeholder="http://example.com:8080" autocomplete="off" />
+
+      <div class="row">
+        <div>
+          <label>Username</label>
+          <input id="username" placeholder="username" autocomplete="off" />
+        </div>
+        <div>
+          <label>Password</label>
+          <input id="password" type="password" placeholder="password" autocomplete="off" />
+        </div>
+      </div>
+
+      <label>طريقة الجلب</label>
+      <select id="mode">
+        <option value="xtream">Xtream API - أفضل للتصنيفات</option>
+        <option value="m3u">M3U Playlist</option>
+      </select>
+
+      <label class="saveLine">
+        <input id="saveLocal" type="checkbox" />
+        حفظ البيانات محليًا على هذا الجهاز فقط
+      </label>
+
+      <button id="loadBtn">فتح القنوات</button>
+
+      <div class="miniButtons">
+        <button class="secondary" id="testBtn">اختبار الاتصال</button>
+        <button class="secondary" id="clearBtn">مسح البيانات</button>
+      </div>
+
+      <div id="status" class="status">اكتب بيانات اشتراكك ثم اضغط “فتح القنوات”.</div>
+
+      <div class="danger">
+        تنبيه مهم: استخدم هذه الصفحة فقط مع اشتراك قانوني تملكه. لا تضع بياناتك داخل الكود عند رفعه على GitHub.
+      </div>
+
+      <div class="hint">
+        لو القنوات لم تعمل على GitHub Pages رغم صحة الاشتراك، فالسبب غالبًا CORS أو منع التشغيل من السيرفر. ساعتها الحل يكون تشغيلها بملف محلي أو وسيط Node.js بسيط.
+      </div>
+    </aside>
+
+    <main class="main">
+      <section class="playerBox">
+        <div class="now">
+          <div>
+            <h2 id="nowTitle">لم يتم تشغيل قناة بعد</h2>
+            <small id="nowUrl"></small>
+          </div>
+          <div id="playState" class="badge">جاهز</div>
+        </div>
+
+        <video id="video" controls playsinline></video>
+      </section>
+
+      <section class="channelsBox">
+        <div class="tools">
+          <input id="search" placeholder="ابحث عن قناة..." />
+          <select id="category">
+            <option value="all">كل التصنيفات</option>
+          </select>
+          <select id="sort">
+            <option value="default">ترتيب الاشتراك</option>
+            <option value="az">أبجديًا A-Z</option>
+            <option value="za">أبجديًا Z-A</option>
+          </select>
+        </div>
+
+        <div class="stats">
+          <span id="count">0 قناة</span>
+          <span id="catCount">0 تصنيف</span>
+        </div>
+
+        <div id="channels" class="channels">
+          <div class="empty">
+            لم يتم تحميل القنوات بعد.<br>
+            بعد إدخال البيانات ستظهر القنوات هنا.
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    const els = {
+      server: $("server"),
+      username: $("username"),
+      password: $("password"),
+      mode: $("mode"),
+      saveLocal: $("saveLocal"),
+      loadBtn: $("loadBtn"),
+      testBtn: $("testBtn"),
+      clearBtn: $("clearBtn"),
+      status: $("status"),
+      search: $("search"),
+      category: $("category"),
+      sort: $("sort"),
+      channels: $("channels"),
+      count: $("count"),
+      catCount: $("catCount"),
+      video: $("video"),
+      nowTitle: $("nowTitle"),
+      nowUrl: $("nowUrl"),
+      playState: $("playState")
+    };
+
+    let allChannels = [];
+    let activeUrl = "";
+    let hls = null;
+
+    function setStatus(msg, type="normal"){
+      els.status.innerHTML = msg;
+      if(type === "ok") els.status.style.color = "var(--ok)";
+      else if(type === "bad") els.status.style.color = "var(--bad)";
+      else els.status.style.color = "var(--muted)";
+    }
+
+    function cleanServer(url){
+      return (url || "").trim().replace(/\/+$/, "");
+    }
+
+    function getCreds(){
+      return {
+        server: cleanServer(els.server.value),
+        username: els.username.value.trim(),
+        password: els.password.value.trim(),
+        mode: els.mode.value
+      };
+    }
+
+    function validateCreds(){
+      const c = getCreds();
+      if(!c.server || !c.username || !c.password){
+        setStatus("اكتب السيرفر واليوزرنيم والباسورد أولًا.", "bad");
+        return null;
+      }
+      return c;
+    }
+
+    function saveSettings(){
+      if(!els.saveLocal.checked) return;
+      const c = getCreds();
+      localStorage.setItem("iptv_settings", JSON.stringify({
+        server:c.server,
+        username:c.username,
+        password:c.password,
+        mode:c.mode,
+        saveLocal:true
+      }));
+    }
+
+    function loadSettings(){
+      try{
+        const saved = JSON.parse(localStorage.getItem("iptv_settings") || "{}");
+        if(saved.saveLocal){
+          els.server.value = saved.server || "";
+          els.username.value = saved.username || "";
+          els.password.value = saved.password || "";
+          els.mode.value = saved.mode || "xtream";
+          els.saveLocal.checked = true;
+        }
+      }catch(e){}
+    }
+
+    function clearSettings(){
+      localStorage.removeItem("iptv_settings");
+      els.server.value = "";
+      els.username.value = "";
+      els.password.value = "";
+      els.saveLocal.checked = false;
+      allChannels = [];
+      activeUrl = "";
+      stopPlayer();
+      renderCategories();
+      renderChannels();
+      setStatus("تم مسح البيانات والقنوات من الصفحة.", "ok");
+    }
+
+    function xtreamUrl(action){
+      const c = getCreds();
+      return `${c.server}/player_api.php?username=${encodeURIComponent(c.username)}&password=${encodeURIComponent(c.password)}&action=${action}`;
+    }
+
+    function streamUrl(streamId, ext="m3u8"){
+      const c = getCreds();
+      return `${c.server}/live/${encodeURIComponent(c.username)}/${encodeURIComponent(c.password)}/${streamId}.${ext || "m3u8"}`;
+    }
+
+    function m3uUrl(){
+      const c = getCreds();
+      return `${c.server}/get.php?username=${encodeURIComponent(c.username)}&password=${encodeURIComponent(c.password)}&type=m3u_plus&output=m3u8`;
+    }
+
+    async function fetchJson(url){
+      const res = await fetch(url);
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    }
+
+    async function fetchText(url){
+      const res = await fetch(url);
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.text();
+    }
+
+    async function testConnection(){
+      const c = validateCreds();
+      if(!c) return;
+
+      setStatus("جاري اختبار الاتصال...");
+      try{
+        if(c.mode === "xtream"){
+          const data = await fetchJson(`${c.server}/player_api.php?username=${encodeURIComponent(c.username)}&password=${encodeURIComponent(c.password)}`);
+          if(data && data.user_info){
+            setStatus(`الاتصال ناجح ✅<br>الحالة: ${data.user_info.status || "غير معروف"}<br>تاريخ الانتهاء: ${data.user_info.exp_date ? new Date(Number(data.user_info.exp_date)*1000).toLocaleString("ar") : "غير متاح"}`, "ok");
+          }else{
+            setStatus("وصلنا للسيرفر، لكن الرد غير متوقع. جرّب وضع M3U.", "bad");
+          }
+        }else{
+          const text = await fetchText(m3uUrl());
+          if(text.includes("#EXTM3U")) setStatus("الاتصال ناجح ✅ وتم العثور على ملف M3U.", "ok");
+          else setStatus("تم الاتصال، لكن الملف لا يبدو M3U صحيحًا.", "bad");
+        }
+      }catch(err){
+        setStatus(`فشل الاختبار ❌<br>${err.message}<br><br>لو البيانات صحيحة، فغالبًا السيرفر يمنع CORS على صفحات الويب.`, "bad");
+      }
+    }
+
+    async function loadChannels(){
+      const c = validateCreds();
+      if(!c) return;
+
+      saveSettings();
+      allChannels = [];
+      renderChannels();
+
+      setStatus("جاري تحميل القنوات...");
+      try{
+        if(c.mode === "xtream"){
+          await loadXtream();
+        }else{
+          await loadM3U();
+        }
+
+        renderCategories();
+        renderChannels();
+        setStatus(`تم تحميل ${allChannels.length} قناة ✅`, "ok");
+      }catch(err){
+        setStatus(`لم يتم تحميل القنوات ❌<br>${err.message}<br><br>جرّب تغيير طريقة الجلب بين Xtream و M3U. لو المشكلة CORS، شغّل الملف محليًا أو استخدم وسيط Node.js.`, "bad");
+      }
+    }
+
+    async function loadXtream(){
+      const cats = await fetchJson(xtreamUrl("get_live_categories"));
+      const streams = await fetchJson(xtreamUrl("get_live_streams"));
+
+      const catMap = {};
+      if(Array.isArray(cats)){
+        cats.forEach(c => catMap[String(c.category_id)] = c.category_name || "بدون تصنيف");
+      }
+
+      allChannels = (streams || []).map((s, i) => ({
+        id: String(s.stream_id || i),
+        name: s.name || `Channel ${i+1}`,
+        group: catMap[String(s.category_id)] || "بدون تصنيف",
+        logo: s.stream_icon || "",
+        url: streamUrl(s.stream_id, s.container_extension || "m3u8"),
+        order: i
+      }));
+    }
+
+    async function loadM3U(){
+      const text = await fetchText(m3uUrl());
+      allChannels = parseM3U(text);
+    }
+
+    function parseM3U(text){
+      const lines = text.split(/\r?\n/);
+      const channels = [];
+
+      for(let i=0; i<lines.length; i++){
+        const line = lines[i].trim();
+        if(!line.startsWith("#EXTINF")) continue;
+
+        const next = (lines[i+1] || "").trim();
+        if(!next || next.startsWith("#")) continue;
+
+        const nameMatch = line.match(/,(.*)$/);
+        const logoMatch = line.match(/tvg-logo="([^"]*)"/i);
+        const groupMatch = line.match(/group-title="([^"]*)"/i);
+
+        channels.push({
+          id: String(channels.length + 1),
+          name: nameMatch ? nameMatch[1].trim() : `Channel ${channels.length+1}`,
+          group: groupMatch ? groupMatch[1].trim() : "بدون تصنيف",
+          logo: logoMatch ? logoMatch[1].trim() : "",
+          url: next,
+          order: channels.length
+        });
+      }
+
+      return channels;
+    }
+
+    function renderCategories(){
+      const groups = [...new Set(allChannels.map(c => c.group || "بدون تصنيف"))].sort((a,b)=>a.localeCompare(b,"ar"));
+      els.category.innerHTML = `<option value="all">كل التصنيفات</option>` + groups.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join("");
+      els.catCount.textContent = `${groups.length} تصنيف`;
+    }
+
+    function getFiltered(){
+      const q = els.search.value.trim().toLowerCase();
+      const cat = els.category.value;
+      let list = allChannels.filter(c => {
+        const matchQ = !q || (c.name || "").toLowerCase().includes(q) || (c.group || "").toLowerCase().includes(q);
+        const matchCat = cat === "all" || c.group === cat;
+        return matchQ && matchCat;
+      });
+
+      if(els.sort.value === "az") list.sort((a,b)=>(a.name || "").localeCompare(b.name || ""));
+      if(els.sort.value === "za") list.sort((a,b)=>(b.name || "").localeCompare(a.name || ""));
+
+      return list;
+    }
+
+    function renderChannels(){
+      const list = getFiltered();
+      els.count.textContent = `${list.length} قناة`;
+
+      if(!allChannels.length){
+        els.channels.innerHTML = `<div class="empty">لم يتم تحميل القنوات بعد.<br>بعد إدخال البيانات ستظهر القنوات هنا.</div>`;
+        return;
+      }
+
+      if(!list.length){
+        els.channels.innerHTML = `<div class="empty">لا توجد قنوات مطابقة للبحث أو التصنيف.</div>`;
+        return;
+      }
+
+      els.channels.innerHTML = list.map(c => `
+        <div class="channel ${c.url === activeUrl ? "active" : ""}" onclick="playChannelById('${escapeAttr(c.id)}')">
+          <img class="chLogo" src="${escapeAttr(c.logo || "")}" onerror="this.src='';this.style.display='none';" />
+          <div class="chText">
+            <div class="chName">${escapeHtml(c.name)}</div>
+            <div class="chGroup">${escapeHtml(c.group || "بدون تصنيف")}</div>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    window.playChannelById = function(id){
+      const ch = allChannels.find(c => c.id === id);
+      if(ch) playChannel(ch);
+    }
+
+    function stopPlayer(){
+      if(hls){
+        hls.destroy();
+        hls = null;
+      }
+      els.video.pause();
+      els.video.removeAttribute("src");
+      els.video.load();
+      els.nowTitle.textContent = "لم يتم تشغيل قناة بعد";
+      els.nowUrl.textContent = "";
+      els.playState.textContent = "جاهز";
+    }
+
+    function playChannel(ch){
+      activeUrl = ch.url;
+      els.nowTitle.textContent = ch.name;
+      els.nowUrl.textContent = ch.url;
+      els.playState.textContent = "تشغيل...";
+      renderChannels();
+
+      if(hls){
+        hls.destroy();
+        hls = null;
+      }
+
+      const url = ch.url;
+
+      if(Hls.isSupported() && (url.includes(".m3u8") || url.includes("m3u8") || url.includes("/live/"))){
+        hls = new Hls({
+          enableWorker:true,
+          lowLatencyMode:true
+        });
+
+        hls.loadSource(url);
+        hls.attachMedia(els.video);
+
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          els.video.play().catch(()=>{});
+          els.playState.textContent = "يعمل";
+        });
+
+        hls.on(Hls.Events.ERROR, (event, data) => {
+          console.warn("HLS error", data);
+          if(data.fatal){
+            els.playState.textContent = "خطأ";
+            setStatus("حدث خطأ في تشغيل القناة. قد يكون الرابط لا يدعم التشغيل من المتصفح أو توجد مشكلة CORS.", "bad");
+          }
+        });
+      }else{
+        els.video.src = url;
+        els.video.play().then(()=>{
+          els.playState.textContent = "يعمل";
+        }).catch(()=>{
+          els.playState.textContent = "اضغط Play";
+          setStatus("المتصفح منع التشغيل التلقائي. اضغط زر التشغيل داخل الفيديو.", "normal");
+        });
+      }
+    }
+
+    function escapeHtml(str){
+      return String(str || "")
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+    }
+
+    function escapeAttr(str){
+      return escapeHtml(str).replaceAll("`","&#096;");
+    }
+
+    els.loadBtn.addEventListener("click", loadChannels);
+    els.testBtn.addEventListener("click", testConnection);
+    els.clearBtn.addEventListener("click", clearSettings);
+    els.search.addEventListener("input", renderChannels);
+    els.category.addEventListener("change", renderChannels);
+    els.sort.addEventListener("change", renderChannels);
+
+    loadSettings();
+  </script>
+</body>
+</html>
